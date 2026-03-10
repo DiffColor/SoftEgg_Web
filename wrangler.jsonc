@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "soft-egg-web",
+  "name": "softegg-web",
   "main": "src/worker/index.ts",
   "compatibility_date": "2026-03-10",
   "assets": {
