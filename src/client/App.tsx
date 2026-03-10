@@ -56,6 +56,7 @@ interface PackagingResultViewModel {
 
 const PARTNER_CODE_LENGTH = 5;
 const STEP_LABELS = ["Partner Access", "Configuration", "Packaging", "Completion"];
+const API_BASE_URL = resolveApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
 
 export function App() {
   const [currentStep, setCurrentStep] = useState<StepIndex>(0);
@@ -236,7 +237,7 @@ export function App() {
   }
 
   async function fetchRemoteSize(uri: string): Promise<number | null> {
-    const payload = await requestJson("/api/artifact/size", {
+    const payload = await requestJson("/api/public/software-artifact/size", {
       method: "POST",
       body: { uri },
       requestErrorMessage: "원격 파일 크기 조회에 실패했습니다.",
@@ -518,7 +519,7 @@ export function App() {
       processedBytes: 0,
     });
 
-    const response = await fetch("/api/artifact/download", {
+    const response = await fetch(buildApiUrl("/api/public/software-artifact/download"), {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -1517,11 +1518,14 @@ async function requestJson(
     requestErrorMessage,
     invalidJsonMessage = "서버 응답을 처리하지 못했습니다.",
   } = options;
-  const response = await fetch(path, {
+  const headers: Record<string, string> = {};
+  if (body != null) {
+    headers["content-type"] = "application/json";
+  }
+
+  const response = await fetch(buildApiUrl(path), {
     method,
-    headers: {
-      "content-type": "application/json",
-    },
+    headers,
     body: body == null ? undefined : JSON.stringify(body),
     cache: "no-store",
     signal,
@@ -1565,7 +1569,7 @@ async function requestJson(
 }
 
 async function probeCatalogServerRequest(): Promise<void> {
-  const response = await fetch("/api/health", {
+  const response = await fetch(buildApiUrl("/api/health"), {
     method: "GET",
     headers: {
       accept: "application/json",
@@ -1594,11 +1598,10 @@ async function probeCatalogServerRequest(): Promise<void> {
 
 async function fetchCatalogRequest(companyCode: string): Promise<CompanyCatalog> {
   const normalizedCode = companyCode.trim().toUpperCase();
-  const response = await fetch(`/api/catalog/${normalizedCode}`, {
+  const response = await fetch(buildApiUrl(`/api/public/software-catalog/${normalizedCode}`), {
     method: "GET",
     headers: {
       accept: "application/json",
-      "content-type": "application/json",
     },
     cache: "no-store",
   });
@@ -1834,4 +1837,31 @@ function timeText(value: Date): string {
     second: "2-digit",
     hour12: false,
   }).format(value);
+}
+
+function buildApiUrl(path: string): string {
+  return new URL(path, API_BASE_URL).toString();
+}
+
+function resolveApiBaseUrl(rawValue: string | undefined): string {
+  const fallbackOrigin =
+    typeof window !== "undefined" ? window.location.origin : "http://localhost";
+  const normalized = rawValue?.trim() || fallbackOrigin;
+
+  try {
+    const parsed = new URL(normalized);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new Error("unsupported protocol");
+    }
+    parsed.pathname = parsed.pathname.replace(/\/+$/, "") || "/";
+    parsed.search = "";
+    parsed.hash = "";
+    return parsed.toString();
+  } catch {
+    console.error("[SoftEgg] Invalid VITE_API_BASE_URL, fallback to current origin", {
+      rawValue,
+      fallbackOrigin,
+    });
+    return fallbackOrigin;
+  }
 }
