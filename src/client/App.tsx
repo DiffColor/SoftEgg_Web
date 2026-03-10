@@ -1178,7 +1178,7 @@ function ConfigurationStep(props: {
       <div className="config-grid__main">
         <Panel
           title="Partner Package Configuration"
-          subtitle={`${catalog.company.companyName}에 할당된 운영 패키지 중 하나를 선택합니다.`}
+          subtitle={`${catalog.company.companyName}에 할당된 전체 OS 패키지를 현재 실행 환경과 무관하게 모두 표시합니다.`}
         >
           <div className="form-grid">
             <label className="field">
@@ -1186,7 +1186,7 @@ function ConfigurationStep(props: {
               <select value={selectedGroup.id} onChange={(event) => onSelectGroup(event.target.value)}>
                 {softwareGroups.map((group) => (
                   <option key={group.id} value={group.id}>
-                    {group.name} {group.codeName}
+                    {group.name} {group.codeName} · {group.os.toUpperCase()} · {group.releaseChannel.toUpperCase()}
                   </option>
                 ))}
               </select>
@@ -1196,7 +1196,7 @@ function ConfigurationStep(props: {
               <select value={selectedPackage.id} onChange={(event) => onSelectPackage(event.target.value)}>
                 {selectedGroup.packages.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {item.version}
+                    {item.version} · {item.os.toUpperCase()} · {item.releaseChannel.toUpperCase()}
                   </option>
                 ))}
               </select>
