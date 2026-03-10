@@ -135,11 +135,7 @@ export function App() {
     setIsCatalogServerChecking(true);
     setHealthError(null);
     try {
-      const response = await fetch("/api/health", { cache: "no-store" });
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({ message: "카탈로그 서버 상태 확인에 실패했습니다." }));
-        throw new Error(String(payload.message ?? "카탈로그 서버 상태 확인에 실패했습니다."));
-      }
+      await apiFetch("/api/health");
       setCatalogServerCheckedAt(new Date().toISOString());
     } catch (error) {
       setHealthError(toHealthUiMessage(error));
@@ -159,14 +155,7 @@ export function App() {
     setCatalogError(null);
 
     try {
-      const response = await fetch(`/api/catalog/${partnerCode}`, {
-        cache: "no-store",
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(String(payload.message ?? "카탈로그 조회에 실패했습니다."));
-      }
-
+      const payload = await apiFetch(`/api/catalog/${partnerCode}`);
       const nextCatalog = parseCompanyCatalog(payload);
       if (nextCatalog.softwarePackages.length === 0) {
         throw new Error("할당된 소프트웨어가 없습니다.");
@@ -245,17 +234,10 @@ export function App() {
   }
 
   async function fetchRemoteSize(uri: string): Promise<number | null> {
-    const response = await fetch("/api/artifact/size", {
+    const payload = await apiFetch("/api/artifact/size", {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ uri }),
+      body: { uri },
     });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(String(payload.message ?? "원격 파일 크기 조회에 실패했습니다."));
-    }
     return typeof payload.size === "number" ? payload.size : null;
   }
 
@@ -1508,6 +1490,46 @@ function RuntimeMeta(props: { label: string; value: string; isDanger?: boolean }
       <span className={props.isDanger ? "is-danger" : ""}>{props.value}</span>
     </div>
   );
+}
+
+async function apiFetch(
+  path: string,
+  options: {
+    method?: string;
+    body?: unknown;
+    signal?: AbortSignal;
+  } = {},
+): Promise<Record<string, unknown>> {
+  const { method = "GET", body, signal } = options;
+  const response = await fetch(path, {
+    method,
+    headers: {
+      "content-type": "application/json",
+    },
+    body: body == null ? undefined : JSON.stringify(body),
+    cache: "no-store",
+    signal,
+  });
+
+  if (!response.ok) {
+    let message = `요청 실패 (${response.status})`;
+    try {
+      const parsed = (await response.json()) as Record<string, unknown>;
+      message =
+        (typeof parsed.message === "string" && parsed.message) ||
+        (typeof parsed.error === "string" && parsed.error) ||
+        message;
+    } catch {
+      // noop
+    }
+    throw new Error(message);
+  }
+
+  if (response.status === 204) {
+    return {};
+  }
+
+  return (await response.json()) as Record<string, unknown>;
 }
 
 function toHealthUiMessage(error: unknown): string {
