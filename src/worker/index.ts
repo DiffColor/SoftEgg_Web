@@ -77,13 +77,26 @@ async function handleCatalog(url: URL, env: Env): Promise<Response> {
     },
   });
   const text = await response.text();
-  return new Response(text, {
-    status: response.status,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      "cache-control": "no-store",
-    },
-  });
+  const payload = tryParseJsonObject(text);
+
+  if (!response.ok) {
+    const message =
+      typeof getField(payload ?? {}, "message") === "string"
+        ? String(getField(payload ?? {}, "message"))
+        : text.trim() || "카탈로그 조회에 실패했습니다.";
+    return json({ message }, response.status);
+  }
+
+  if (payload == null) {
+    return json({ message: "카탈로그 서버 응답을 처리하지 못했습니다." }, 502);
+  }
+
+  const normalizedPayload = unwrapCatalogPayload(payload);
+  if (!hasField(normalizedPayload, "softwarePackages")) {
+    return json({ message: "카탈로그 서버 응답 형식이 올바르지 않습니다." }, 502);
+  }
+
+  return json(payload);
 }
 
 async function handleArtifactSize(request: Request, env: Env): Promise<Response> {
@@ -174,6 +187,53 @@ function normalizeCompanyCode(value: string): string {
     .trim()
     .replace(/\s+/g, "")
     .toUpperCase();
+}
+
+function tryParseJsonObject(text: string): Record<string, unknown> | null {
+  if (!text.trim()) {
+    return null;
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return asRecord(parsed);
+  } catch {
+    return null;
+  }
+}
+
+function unwrapCatalogPayload(payload: Record<string, unknown>): Record<string, unknown> {
+  const nested = asRecord(getField(payload, "data"));
+  if (hasField(nested, "softwarePackages") || hasField(nested, "company")) {
+    return nested;
+  }
+  return payload;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (typeof value !== "object" || value == null || Array.isArray(value)) {
+    return {};
+  }
+  return value as Record<string, unknown>;
+}
+
+function hasField(record: Record<string, unknown>, key: string): boolean {
+  return getField(record, key) !== undefined;
+}
+
+function getField(record: Record<string, unknown>, key: string): unknown {
+  if (key in record) {
+    return record[key];
+  }
+
+  const normalizedKey = key.toLowerCase();
+  for (const [entryKey, value] of Object.entries(record)) {
+    if (entryKey.toLowerCase() === normalizedKey) {
+      return value;
+    }
+  }
+
+  return undefined;
 }
 
 function json(payload: unknown, status = 200): Response {
