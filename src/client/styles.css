@@ -438,10 +438,25 @@ button {
 
 .field select {
   width: 100%;
-  padding: 14px 16px;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding: 14px 52px 14px 16px;
   border-radius: 14px;
   border: 1px solid #4b5d75;
-  background: #08111d;
+  background:
+    linear-gradient(45deg, transparent 50%, #7dd3fc 50%),
+    linear-gradient(135deg, #7dd3fc 50%, transparent 50%),
+    #08111d;
+  background-position:
+    calc(100% - 22px) calc(50% - 2px),
+    calc(100% - 16px) calc(50% - 2px),
+    0 0;
+  background-size:
+    6px 6px,
+    6px 6px,
+    auto;
+  background-repeat: no-repeat;
   color: #fff;
 }
 
