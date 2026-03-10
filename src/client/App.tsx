@@ -135,11 +135,10 @@ export function App() {
     setIsCatalogServerChecking(true);
     setHealthError(null);
     try {
-      const response = await fetch("/api/health", { cache: "no-store" });
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({ message: "카탈로그 서버 상태 확인에 실패했습니다." }));
-        throw new Error(String(payload.message ?? "카탈로그 서버 상태 확인에 실패했습니다."));
-      }
+      await apiFetch("/api/health", {
+        requestErrorMessage: "카탈로그 서버 상태 확인에 실패했습니다.",
+        invalidJsonMessage: "카탈로그 서버 응답을 처리하지 못했습니다.",
+      });
       setCatalogServerCheckedAt(new Date().toISOString());
     } catch (error) {
       setHealthError(toHealthUiMessage(error));
@@ -532,8 +531,7 @@ export function App() {
     });
 
     if (!response.ok || response.body == null) {
-      const payload = await response.json().catch(() => ({}));
-      throw new Error(String(payload.message ?? "FTP 다운로드에 실패했습니다."));
+      throw new Error(await readApiErrorMessage(response, "FTP 다운로드에 실패했습니다."));
     }
 
     const totalBytes =
@@ -1566,6 +1564,17 @@ function parseJsonObject(text: string): Record<string, unknown> | null {
   } catch {
     return null;
   }
+}
+
+async function readApiErrorMessage(response: Response, fallbackMessage: string): Promise<string> {
+  const text = await response.text().catch(() => "");
+  const parsed = parseJsonObject(text);
+  return (
+    (typeof parsed?.message === "string" && parsed.message) ||
+    (typeof parsed?.error === "string" && parsed.error) ||
+    text.trim() ||
+    fallbackMessage
+  );
 }
 
 function toHealthUiMessage(error: unknown): string {
