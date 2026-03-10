@@ -38,5 +38,29 @@ npm run build
 npm run deploy
 ```
 
-`wrangler.jsonc`에 현재 Flutter 앱과 동일한 운영 기본값이 들어 있습니다.
-운영 환경에서는 Cloudflare secret 또는 환경별 설정으로 분리하는 것을 권장합니다.
+민감한 서버 정보는 저장소에 두지 않습니다.
+
+로컬 Worker 개발 시에는 셸 환경변수에 값을 넣고 `.dev.vars`를 생성하십시오.
+
+```bash
+export SOFTEGG_API_BASE_URL=https://example.com
+export SOFTEGG_FTP_HOST=ftp.example.com
+export SOFTEGG_FTP_USER=your-user
+export SOFTEGG_FTP_PASSWORD=your-password
+npm run setup:worker-env
+```
+
+`.dev.vars.example`는 필요한 키 목록 확인용 예시 파일입니다.
+
+운영 배포 시에는 다음 기준으로 관리하십시오.
+
+- 변수: `SOFTEGG_API_BASE_URL`, `SOFTEGG_FTP_HOST`, `SOFTEGG_FTP_USER`
+- 시크릿: `SOFTEGG_FTP_PASSWORD`
+
+비밀번호는 Cloudflare Secret으로 등록하십시오.
+
+```bash
+wrangler secret put SOFTEGG_FTP_PASSWORD
+```
+
+Worker는 위 값이 없으면 요청 처리 시 즉시 오류를 반환합니다.

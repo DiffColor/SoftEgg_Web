@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "setup:worker-env": "bash ./scripts/setup-worker-env.sh",
     "dev": "vite",
     "dev:worker": "wrangler dev",
     "build": "tsc -b && vite build",

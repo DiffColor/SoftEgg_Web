@@ -45,7 +45,8 @@ export default {
 } satisfies ExportedHandler<Env>;
 
 async function handleHealth(env: Env): Promise<Response> {
-  const response = await fetch(new URL("/api/health", env.SOFTEGG_API_BASE_URL));
+  const apiBaseUrl = requireEnv(env.SOFTEGG_API_BASE_URL, "SOFTEGG_API_BASE_URL");
+  const response = await fetch(new URL("/api/health", apiBaseUrl));
   if (!response.ok) {
     const message = await response.text();
     return json(
@@ -62,12 +63,13 @@ async function handleHealth(env: Env): Promise<Response> {
 }
 
 async function handleCatalog(url: URL, env: Env): Promise<Response> {
+  const apiBaseUrl = requireEnv(env.SOFTEGG_API_BASE_URL, "SOFTEGG_API_BASE_URL");
   const companyCode = url.pathname.split("/").pop()?.trim().toUpperCase() ?? "";
   if (!/^[A-Z0-9]{5}$/.test(companyCode)) {
     return json({ message: "회사 코드는 영문/숫자 5자리여야 합니다." }, 400);
   }
 
-  const upstreamUrl = new URL(`/api/public/software-catalog/${companyCode}`, env.SOFTEGG_API_BASE_URL);
+  const upstreamUrl = new URL(`/api/public/software-catalog/${companyCode}`, apiBaseUrl);
   const response = await fetch(upstreamUrl, {
     headers: {
       accept: "application/json",
@@ -84,6 +86,7 @@ async function handleCatalog(url: URL, env: Env): Promise<Response> {
 }
 
 async function handleArtifactSize(request: Request, env: Env): Promise<Response> {
+  const ftpCredentials = getFtpCredentials(env);
   const body = await request.json<{ uri?: string }>();
   const uri = body.uri?.trim();
   if (!uri) {
@@ -91,14 +94,15 @@ async function handleArtifactSize(request: Request, env: Env): Promise<Response>
   }
 
   const size = await ftpService.fetchRemoteSize(uri, {
-    host: env.SOFTEGG_FTP_HOST,
-    user: env.SOFTEGG_FTP_USER,
-    password: env.SOFTEGG_FTP_PASSWORD,
+    host: ftpCredentials.host,
+    user: ftpCredentials.user,
+    password: ftpCredentials.password,
   });
   return json({ size });
 }
 
 async function handleArtifactDownload(request: Request, env: Env): Promise<Response> {
+  const ftpCredentials = getFtpCredentials(env);
   const body = await request.json<{ uri?: string; checksum?: string; fileName?: string }>();
   const uri = body.uri?.trim();
   if (!uri) {
@@ -106,9 +110,9 @@ async function handleArtifactDownload(request: Request, env: Env): Promise<Respo
   }
 
   const data = await ftpService.downloadFile(uri, {
-    host: env.SOFTEGG_FTP_HOST,
-    user: env.SOFTEGG_FTP_USER,
-    password: env.SOFTEGG_FTP_PASSWORD,
+    host: ftpCredentials.host,
+    user: ftpCredentials.user,
+    password: ftpCredentials.password,
   });
   const fileName = (body.fileName?.trim() || "artifact.bin").replaceAll(/["\r\n]/g, "_");
 
@@ -124,6 +128,26 @@ async function handleArtifactDownload(request: Request, env: Env): Promise<Respo
       "cache-control": "no-store",
     },
   });
+}
+
+function getFtpCredentials(env: Env): {
+  host: string;
+  user: string;
+  password: string;
+} {
+  return {
+    host: requireEnv(env.SOFTEGG_FTP_HOST, "SOFTEGG_FTP_HOST"),
+    user: requireEnv(env.SOFTEGG_FTP_USER, "SOFTEGG_FTP_USER"),
+    password: requireEnv(env.SOFTEGG_FTP_PASSWORD, "SOFTEGG_FTP_PASSWORD"),
+  };
+}
+
+function requireEnv(value: string | undefined, key: string): string {
+  const normalized = value?.trim();
+  if (!normalized) {
+    throw new Error(`${key} 설정이 필요합니다.`);
+  }
+  return normalized;
 }
 
 function json(payload: unknown, status = 200): Response {
