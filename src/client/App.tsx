@@ -168,9 +168,13 @@ export function App() {
       }
 
       const nextCatalog = parseCompanyCatalog(payload);
+      if (nextCatalog.softwarePackages.length === 0) {
+        throw new Error("할당된 소프트웨어가 없습니다.");
+      }
+
       const groups = buildGroups(nextCatalog);
       if (groups.length === 0) {
-        throw new Error("패키징 가능한 소프트웨어가 없습니다.");
+        throw new Error("표시 가능한 소프트웨어가 없습니다.");
       }
 
       const firstGroup = groups[0];
@@ -190,7 +194,7 @@ export function App() {
       );
       showNotice(
         "카탈로그 조회 완료",
-        `${nextCatalog.company.companyName}에 할당된 ${groups.length}개 제품군을 불러왔습니다.`,
+        `${nextCatalog.company.companyName}에 할당된 ${nextCatalog.softwarePackages.length}개 패키지를 불러왔습니다.`,
         "success",
       );
     } catch (error) {
@@ -1522,7 +1526,7 @@ function toCatalogUiMessage(error: unknown): string {
       "회사 코드가 만료되었거나 일치하지 않습니다.",
       "회사 코드가 중복되어 확인할 수 없습니다. 관리자에게 문의해 주세요.",
       "카탈로그 응답 형식이 올바르지 않습니다.",
-      "패키징 가능한 소프트웨어가 없습니다.",
+      "표시 가능한 소프트웨어가 없습니다.",
       "할당된 소프트웨어가 없습니다.",
       "카탈로그 조회에 실패했습니다.",
     ])
