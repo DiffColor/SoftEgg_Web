@@ -5,6 +5,7 @@ export interface Env {
   ASSETS: Fetcher;
   SOFTEGG_API_BASE_URL: string;
   SOFTEGG_FTP_HOST: string;
+  SOFTEGG_FTP_PORT?: string;
   SOFTEGG_FTP_USER: string;
   SOFTEGG_FTP_PASSWORD: string;
 }
@@ -96,6 +97,7 @@ async function handleArtifactSize(request: Request, env: Env): Promise<Response>
 
   const size = await ftpService.fetchRemoteSize(uri, {
     host: ftpCredentials.host,
+    port: ftpCredentials.port,
     user: ftpCredentials.user,
     password: ftpCredentials.password,
   });
@@ -112,6 +114,7 @@ async function handleArtifactDownload(request: Request, env: Env): Promise<Respo
 
   const data = await ftpService.downloadFile(uri, {
     host: ftpCredentials.host,
+    port: ftpCredentials.port,
     user: ftpCredentials.user,
     password: ftpCredentials.password,
   });
@@ -151,11 +154,17 @@ function getApiBaseUrl(env: Env): URL {
 
 function getFtpCredentials(env: Env): {
   host: string;
+  port: number;
   user: string;
   password: string;
 } {
+  const endpoint = parseFtpEndpoint(
+    requireEnv(env.SOFTEGG_FTP_HOST, "SOFTEGG_FTP_HOST"),
+    env.SOFTEGG_FTP_PORT,
+  );
   return {
-    host: requireEnv(env.SOFTEGG_FTP_HOST, "SOFTEGG_FTP_HOST"),
+    host: endpoint.host,
+    port: endpoint.port,
     user: requireEnv(env.SOFTEGG_FTP_USER, "SOFTEGG_FTP_USER"),
     password: requireEnv(env.SOFTEGG_FTP_PASSWORD, "SOFTEGG_FTP_PASSWORD"),
   };
@@ -174,6 +183,43 @@ function normalizeCompanyCode(value: string): string {
     .trim()
     .replace(/\s+/g, "")
     .toUpperCase();
+}
+
+function parseFtpEndpoint(hostValue: string, portValue?: string): {
+  host: string;
+  port: number;
+} {
+  const normalizedHost = hostValue.trim();
+  const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(normalizedHost)
+    ? normalizedHost
+    : `ftp://${normalizedHost}`;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    throw new Error("SOFTEGG_FTP_HOST 형식이 올바르지 않습니다.");
+  }
+
+  if (parsed.protocol !== "ftp:") {
+    throw new Error("SOFTEGG_FTP_HOST는 FTP 주소여야 합니다.");
+  }
+
+  const host = parsed.hostname.trim();
+  if (!host) {
+    throw new Error("SOFTEGG_FTP_HOST 형식이 올바르지 않습니다.");
+  }
+
+  const rawPort = portValue?.trim() || parsed.port || "21";
+  const port = Number.parseInt(rawPort, 10);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error("SOFTEGG_FTP_PORT 형식이 올바르지 않습니다.");
+  }
+
+  return {
+    host,
+    port,
+  };
 }
 
 function json(payload: unknown, status = 200): Response {

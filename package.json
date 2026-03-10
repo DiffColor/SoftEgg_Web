@@ -8,6 +8,7 @@
     "dev": "vite",
     "dev:worker": "wrangler dev",
     "build": "tsc -b && vite build",
+    "verify:api": "node --experimental-strip-types ./scripts/verify-api.mjs",
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy"
   },

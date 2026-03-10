@@ -30,6 +30,9 @@ umask 077
 {
   printf 'SOFTEGG_API_BASE_URL=%s\n' "$SOFTEGG_API_BASE_URL"
   printf 'SOFTEGG_FTP_HOST=%s\n' "$SOFTEGG_FTP_HOST"
+  if [ -n "${SOFTEGG_FTP_PORT-}" ]; then
+    printf 'SOFTEGG_FTP_PORT=%s\n' "$SOFTEGG_FTP_PORT"
+  fi
   printf 'SOFTEGG_FTP_USER=%s\n' "$SOFTEGG_FTP_USER"
   printf 'SOFTEGG_FTP_PASSWORD=%s\n' "$SOFTEGG_FTP_PASSWORD"
 } > "$TMP_FILE"

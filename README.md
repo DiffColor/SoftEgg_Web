@@ -32,6 +32,17 @@ npm run dev:worker
 npm run build
 ```
 
+## API 검증
+
+현재 프로젝트의 Worker API 4종(`/api/health`, `/api/catalog/:companyCode`, `/api/artifact/size`, `/api/artifact/download`)과
+카탈로그 파싱 로직은 다음 명령으로 로컬에서 한 번에 검증할 수 있습니다.
+
+```bash
+npm run verify:api
+```
+
+검증 스크립트는 모의 카탈로그 서버, 모의 FTP 서버, Wrangler Worker를 함께 띄운 뒤 실제 HTTP 요청과 응답 파싱까지 확인합니다.
+
 ## Cloudflare 배포
 
 ```bash
@@ -45,16 +56,17 @@ npm run deploy
 ```bash
 export SOFTEGG_API_BASE_URL=https://example.com
 export SOFTEGG_FTP_HOST=ftp.example.com
+export SOFTEGG_FTP_PORT=21
 export SOFTEGG_FTP_USER=your-user
 export SOFTEGG_FTP_PASSWORD=your-password
 npm run setup:worker-env
 ```
 
-`.dev.vars.example`는 필요한 키 목록 확인용 예시 파일입니다.
+`.dev.vars.example`는 필요한 키 목록 확인용 예시 파일입니다. FTP가 기본 포트 `21`이 아닌 경우 `SOFTEGG_FTP_PORT`를 함께 설정하십시오.
 
 운영 배포 시에는 다음 기준으로 관리하십시오.
 
-- 변수: `SOFTEGG_API_BASE_URL`, `SOFTEGG_FTP_HOST`, `SOFTEGG_FTP_USER`
+- 변수: `SOFTEGG_API_BASE_URL`, `SOFTEGG_FTP_HOST`, `SOFTEGG_FTP_PORT`, `SOFTEGG_FTP_USER`
 - 시크릿: `SOFTEGG_FTP_PASSWORD`
 
 비밀번호는 Cloudflare Secret으로 등록하십시오.

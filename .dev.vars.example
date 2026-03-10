@@ -1,4 +1,5 @@
 SOFTEGG_API_BASE_URL=https://example.com
 SOFTEGG_FTP_HOST=ftp.example.com
+SOFTEGG_FTP_PORT=21
 SOFTEGG_FTP_USER=your-user
 SOFTEGG_FTP_PASSWORD=your-password

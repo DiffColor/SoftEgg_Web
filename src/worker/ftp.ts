@@ -2,12 +2,14 @@ import { connect } from "cloudflare:sockets";
 
 export interface FtpCredentials {
   host: string;
+  port: number;
   user: string;
   password: string;
 }
 
 export interface RemoteTarget {
   host: string;
+  port: number;
   absolutePath: string;
   fileName: string;
 }
@@ -19,32 +21,33 @@ interface FtpResponse {
 
 export class FtpService {
   async fetchRemoteSize(uri: string, credentials: FtpCredentials): Promise<number | null> {
-    const target = parseRemoteTarget(uri, credentials.host);
-    const client = new FtpClient(target.host);
+    const target = parseRemoteTarget(uri, credentials.host, credentials.port);
+    const client = new FtpClient(target.host, target.port);
     try {
       await client.connect(credentials.user, credentials.password);
       await client.changeToParentDirectory(target.absolutePath);
       return await client.size(target.fileName);
     } finally {
-      await client.close();
+      void client.close();
     }
   }
 
   async downloadFile(uri: string, credentials: FtpCredentials): Promise<Uint8Array> {
-    const target = parseRemoteTarget(uri, credentials.host);
-    const client = new FtpClient(target.host);
+    const target = parseRemoteTarget(uri, credentials.host, credentials.port);
+    const client = new FtpClient(target.host, target.port);
     try {
       await client.connect(credentials.user, credentials.password);
       await client.changeToParentDirectory(target.absolutePath);
       return await client.download(target.fileName);
     } finally {
-      await client.close();
+      void client.close();
     }
   }
 }
 
 class FtpClient {
   private readonly host: string;
+  private readonly port: number;
   private readonly decoder = new TextDecoder();
   private readonly encoder = new TextEncoder();
   private socket: Socket | null = null;
@@ -52,15 +55,19 @@ class FtpClient {
   private writer: WritableStreamDefaultWriter<Uint8Array> | null = null;
   private lineBuffer = "";
 
-  constructor(host: string) {
+  constructor(host: string, port: number) {
     this.host = host;
+    this.port = port;
   }
 
   async connect(user: string, password: string): Promise<void> {
     this.socket = connect({
       hostname: this.host,
-      port: 21,
+      port: this.port,
+    }, {
+      allowHalfOpen: true,
     });
+    await this.socket.opened;
     this.reader = this.socket.readable.getReader();
     this.writer = this.socket.writable.getWriter();
 
@@ -116,7 +123,10 @@ class FtpClient {
     const dataSocket = connect({
       hostname: dataChannel.host,
       port: dataChannel.port,
+    }, {
+      allowHalfOpen: true,
     });
+    await dataSocket.opened;
 
     try {
       const transferResponsePromise = this.command(`RETR ${fileName}`);
@@ -142,30 +152,6 @@ class FtpClient {
   }
 
   async close(): Promise<void> {
-    try {
-      if (this.writer != null) {
-        await this.writer.write(this.encoder.encode("QUIT\r\n"));
-      }
-    } catch {
-      // ignore quit errors
-    }
-
-    try {
-      await this.writer?.close();
-    } catch {
-      // ignore close errors
-    }
-    this.writer?.releaseLock();
-    this.reader?.releaseLock();
-
-    if (this.socket != null) {
-      try {
-        await this.socket.close();
-      } catch {
-        // ignore socket close errors
-      }
-    }
-
     this.socket = null;
     this.reader = null;
     this.writer = null;
@@ -262,7 +248,7 @@ async function collectStream(stream: ReadableStream<Uint8Array>): Promise<Uint8A
   return output;
 }
 
-function parseRemoteTarget(uriValue: string, fallbackHost: string): RemoteTarget {
+function parseRemoteTarget(uriValue: string, fallbackHost: string, fallbackPort = 21): RemoteTarget {
   const uri = new URL(uriValue);
   if (uri.protocol.replace(":", "").toLowerCase() !== "ftp") {
     throw new Error(`FTP URI 형식이 아닙니다: ${uriValue}`);
@@ -280,9 +266,18 @@ function parseRemoteTarget(uriValue: string, fallbackHost: string): RemoteTarget
 
   return {
     host: uri.hostname || fallbackHost,
+    port: uri.port ? normalizePort(uri.port, uriValue) : fallbackPort,
     absolutePath: `/${decodedSegments.join("/")}`,
     fileName: decodedSegments[decodedSegments.length - 1],
   };
+}
+
+function normalizePort(value: string, source: string): number {
+  const port = Number.parseInt(value, 10);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`FTP 포트 형식이 올바르지 않습니다: ${source}`);
+  }
+  return port;
 }
 
 function parsePassiveAddress(message: string, fallbackHost: string): { host: string; port: number } {
