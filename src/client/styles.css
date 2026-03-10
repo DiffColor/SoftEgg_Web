@@ -292,6 +292,13 @@ button {
   font-weight: 700;
 }
 
+.code-input--full {
+  width: min(420px, 100%);
+  padding: 0 18px;
+  text-align: left;
+  letter-spacing: 0.08em;
+}
+
 .code-input:focus {
   outline: 2px solid #60a5fa;
   outline-offset: 2px;

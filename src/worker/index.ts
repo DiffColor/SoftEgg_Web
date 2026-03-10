@@ -64,9 +64,9 @@ async function handleHealth(env: Env): Promise<Response> {
 
 async function handleCatalog(url: URL, env: Env): Promise<Response> {
   const apiBaseUrl = getApiBaseUrl(env);
-  const companyCode = url.pathname.split("/").pop()?.trim().toUpperCase() ?? "";
-  if (!/^[A-Z0-9]{5}$/.test(companyCode)) {
-    return json({ message: "회사 코드는 영문/숫자 5자리여야 합니다." }, 400);
+  const companyCode = normalizeCompanyCode(url.pathname.split("/").pop() ?? "");
+  if (!companyCode) {
+    return json({ message: "회사 코드를 입력해 주세요." }, 400);
   }
 
   const upstreamUrl = new URL(`/api/public/software-catalog/${companyCode}`, apiBaseUrl);
@@ -167,6 +167,13 @@ function requireEnv(value: string | undefined, key: string): string {
     throw new Error(`${key} 설정이 필요합니다.`);
   }
   return normalized;
+}
+
+function normalizeCompanyCode(value: string): string {
+  return value
+    .trim()
+    .replace(/\s+/g, "")
+    .toUpperCase();
 }
 
 function json(payload: unknown, status = 200): Response {
