@@ -1177,7 +1177,7 @@ function ConfigurationStep(props: {
               <select value={selectedGroup.id} onChange={(event) => onSelectGroup(event.target.value)}>
                 {softwareGroups.map((group) => (
                   <option key={group.id} value={group.id}>
-                    {group.name} {group.codeName} · {group.os.toUpperCase()} · {group.releaseChannel.toUpperCase()}
+                    {group.name}
                   </option>
                 ))}
               </select>
@@ -1187,7 +1187,7 @@ function ConfigurationStep(props: {
               <select value={selectedPackage.id} onChange={(event) => onSelectPackage(event.target.value)}>
                 {selectedGroup.packages.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {item.version} · {item.os.toUpperCase()} · {item.releaseChannel.toUpperCase()}
+                    {item.version}
                   </option>
                 ))}
               </select>
