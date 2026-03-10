@@ -112,7 +112,7 @@ export function parseCompanyCatalog(payload: unknown): CompanyCatalog {
 
 export function buildGroups(catalog: CompanyCatalog): SoftwareGroupViewModel[] {
   const groups = new Map<string, RemoteSoftwarePackage[]>();
-  for (const item of catalog.softwarePackages.filter(isDesktopPackage)) {
+  for (const item of catalog.softwarePackages) {
     const key = `${item.name}|${item.codeName}|${item.os.toLowerCase()}|${item.releaseChannel.toLowerCase()}`;
     const list = groups.get(key) ?? [];
     list.push(item);
@@ -141,11 +141,6 @@ export function buildGroups(catalog: CompanyCatalog): SoftwareGroupViewModel[] {
       }
       return left.codeName.toLowerCase().localeCompare(right.codeName.toLowerCase());
     });
-}
-
-export function isDesktopPackage(item: RemoteSoftwarePackage): boolean {
-  const normalized = item.os.toLowerCase();
-  return normalized === "windows" || normalized === "macos" || normalized === "all";
 }
 
 export function hasUri(binary: RemoteSoftwareBinary): boolean {

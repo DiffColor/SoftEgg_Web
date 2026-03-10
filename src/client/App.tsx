@@ -170,7 +170,7 @@ export function App() {
       const nextCatalog = parseCompanyCatalog(payload);
       const groups = buildGroups(nextCatalog);
       if (groups.length === 0) {
-        throw new Error("데스크톱 패키징 가능한 소프트웨어가 없습니다.");
+        throw new Error("패키징 가능한 소프트웨어가 없습니다.");
       }
 
       const firstGroup = groups[0];
@@ -1521,7 +1521,7 @@ function toCatalogUiMessage(error: unknown): string {
       "회사 코드를 입력해 주세요.",
       "회사 코드가 만료되었거나 일치하지 않습니다.",
       "회사 코드가 중복되어 확인할 수 없습니다. 관리자에게 문의해 주세요.",
-      "데스크톱 패키징 가능한 소프트웨어가 없습니다.",
+      "패키징 가능한 소프트웨어가 없습니다.",
       "할당된 소프트웨어가 없습니다.",
       "카탈로그 조회에 실패했습니다.",
     ])
