@@ -54,12 +54,14 @@ interface PackagingResultViewModel {
   blob: Blob;
 }
 
-const MAX_COMPANY_CODE_LENGTH = 32;
+const PARTNER_CODE_LENGTH = 5;
 const STEP_LABELS = ["Partner Access", "Configuration", "Packaging", "Completion"];
 
 export function App() {
   const [currentStep, setCurrentStep] = useState<StepIndex>(0);
-  const [partnerCodeInput, setPartnerCodeInput] = useState("");
+  const [partnerCodeInputs, setPartnerCodeInputs] = useState<string[]>(
+    Array.from({ length: PARTNER_CODE_LENGTH }, () => ""),
+  );
   const [isHealthLoading, setIsHealthLoading] = useState(true);
   const [isCatalogServerChecking, setIsCatalogServerChecking] = useState(false);
   const [healthError, setHealthError] = useState<string | null>(null);
@@ -85,7 +87,7 @@ export function App() {
   const [currentBytesPerSecond, setCurrentBytesPerSecond] = useState<number | null>(null);
   const [packagingResult, setPackagingResult] = useState<PackagingResultViewModel | null>(null);
 
-  const partnerCodeInputRef = useRef<HTMLInputElement | null>(null);
+  const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const packagingAbortControllerRef = useRef<AbortController | null>(null);
   const packagingCancelledRef = useRef(false);
   const elapsedTimerRef = useRef<number | null>(null);
@@ -93,8 +95,8 @@ export function App() {
   const activeSessionIdRef = useRef<number | null>(null);
   const blobUrlRef = useRef<string | null>(null);
 
-  const partnerCode = normalizeCompanyCodeInput(partnerCodeInput);
-  const canAuthorizePartnerCode = partnerCode.length > 0;
+  const partnerCode = normalizeCompanyCodeInput(partnerCodeInputs.join(""));
+  const isPartnerCodeComplete = /^[A-Z0-9]{5}$/.test(partnerCode);
   const runtimeEngineStatus = healthError == null ? "edge runtime ready" : "runtime check required";
   const runtimeCatalogStatus = healthError == null ? "catalog service connected" : "catalog service unavailable";
 
@@ -149,7 +151,7 @@ export function App() {
   }
 
   async function authorizePartnerCode(): Promise<void> {
-    if (!canAuthorizePartnerCode || isCatalogLoading) {
+    if (!isPartnerCodeComplete || isCatalogLoading) {
       return;
     }
 
@@ -673,7 +675,7 @@ export function App() {
     }
     releaseBlobUrl();
     setCurrentStep(0);
-    setPartnerCodeInput("");
+    setPartnerCodeInputs(Array.from({ length: PARTNER_CODE_LENGTH }, () => ""));
     setCatalog(null);
     setSoftwareGroups([]);
     setSelectedGroupId("");
@@ -691,7 +693,7 @@ export function App() {
     setCurrentProcessedBytes(null);
     setCurrentTotalBytes(null);
     setCurrentBytesPerSecond(null);
-    window.setTimeout(() => partnerCodeInputRef.current?.focus(), 0);
+    window.setTimeout(() => inputRefs.current[0]?.focus(), 0);
   }
 
   function startNewPackageFromCurrentAccess(): void {
@@ -893,14 +895,42 @@ export function App() {
       <main className="content">
         {currentStep === 0 ? (
           <PartnerStep
-            partnerCodeInput={partnerCodeInput}
-            canAuthorizePartnerCode={canAuthorizePartnerCode}
+            partnerCodeInputs={partnerCodeInputs}
+            isPartnerCodeComplete={isPartnerCodeComplete}
             partnerCode={partnerCode}
-            onChange={(value) => {
-              setPartnerCodeInput(value.toUpperCase().replace(/[^A-Z0-9 ]/g, "").slice(0, MAX_COMPANY_CODE_LENGTH));
+            onChange={(index, value) => {
+              const normalized = value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 1);
+              setPartnerCodeInputs((current) => {
+                const next = [...current];
+                next[index] = normalized;
+                return next;
+              });
+              if (normalized && index < PARTNER_CODE_LENGTH - 1) {
+                window.setTimeout(() => inputRefs.current[index + 1]?.focus(), 0);
+              }
             }}
-            onSubmit={authorizePartnerCode}
-            inputRef={partnerCodeInputRef}
+            onKeyDown={(index, event) => {
+              if (event.key !== "Backspace") {
+                return;
+              }
+              if (partnerCodeInputs[index]) {
+                setPartnerCodeInputs((current) => {
+                  const next = [...current];
+                  next[index] = "";
+                  return next;
+                });
+                return;
+              }
+              if (index > 0) {
+                setPartnerCodeInputs((current) => {
+                  const next = [...current];
+                  next[index - 1] = "";
+                  return next;
+                });
+                window.setTimeout(() => inputRefs.current[index - 1]?.focus(), 0);
+              }
+            }}
+            inputRefs={inputRefs}
             isHealthLoading={isHealthLoading}
             isCatalogServerChecking={isCatalogServerChecking}
             healthError={healthError}
@@ -972,7 +1002,7 @@ export function App() {
             <button
               className="button"
               type="button"
-              disabled={!canAuthorizePartnerCode || isCatalogLoading || isHealthLoading}
+              disabled={!isPartnerCodeComplete || isCatalogLoading || isHealthLoading}
               onClick={() => void authorizePartnerCode()}
             >
               {isCatalogLoading ? "Authorizing..." : "Authorize Access"}
@@ -1011,12 +1041,12 @@ export function App() {
 }
 
 function PartnerStep(props: {
-  partnerCodeInput: string;
+  partnerCodeInputs: string[];
   partnerCode: string;
-  canAuthorizePartnerCode: boolean;
-  onChange: (value: string) => void;
-  onSubmit: () => Promise<void>;
-  inputRef: React.MutableRefObject<HTMLInputElement | null>;
+  isPartnerCodeComplete: boolean;
+  onChange: (index: number, value: string) => void;
+  onKeyDown: (index: number, event: React.KeyboardEvent<HTMLInputElement>) => void;
+  inputRefs: React.MutableRefObject<Array<HTMLInputElement | null>>;
   isHealthLoading: boolean;
   isCatalogServerChecking: boolean;
   healthError: string | null;
@@ -1028,12 +1058,12 @@ function PartnerStep(props: {
   onProbe: () => Promise<void>;
 }) {
   const {
-    partnerCodeInput,
+    partnerCodeInputs,
     partnerCode,
-    canAuthorizePartnerCode,
+    isPartnerCodeComplete,
     onChange,
-    onSubmit,
-    inputRef,
+    onKeyDown,
+    inputRefs,
     isHealthLoading,
     isCatalogServerChecking,
     healthError,
@@ -1050,26 +1080,27 @@ function PartnerStep(props: {
       <div className="panel panel--hero">
         <div className="eyebrow">SECURE TERMINAL</div>
         <h1 className="hero-title">Partner Access Gateway</h1>
-        <p className="hero-copy">회사 코드를 입력하면 실제 운영 카탈로그를 조회합니다.</p>
+        <p className="hero-copy">5자리 회사 코드를 입력하면 실제 운영 카탈로그를 조회합니다.</p>
         <div className="code-grid">
-          <input
-            ref={inputRef}
-            className="code-input code-input--full"
-            inputMode="text"
-            autoComplete="off"
-            maxLength={MAX_COMPANY_CODE_LENGTH}
-            value={partnerCodeInput}
-            onChange={(event) => onChange(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && canAuthorizePartnerCode && !isCatalogLoading && !isHealthLoading) {
-                void onSubmit();
-              }
-            }}
-          />
+          {partnerCodeInputs.map((value, index) => (
+            <input
+              key={index}
+              ref={(element) => {
+                inputRefs.current[index] = element;
+              }}
+              className="code-input"
+              inputMode="text"
+              autoComplete="off"
+              maxLength={1}
+              value={value}
+              onChange={(event) => onChange(index, event.target.value)}
+              onKeyDown={(event) => onKeyDown(index, event)}
+            />
+          ))}
         </div>
         {partnerCode ? (
-          <div className={`code-state ${canAuthorizePartnerCode ? "is-valid" : "is-pending"}`}>
-            입력 코드: {partnerCode}
+          <div className={`code-state ${isPartnerCodeComplete ? "is-valid" : "is-pending"}`}>
+            입력 코드: {partnerCode.padEnd(5, "•")}
           </div>
         ) : null}
         <div className="runtime-console">
@@ -1099,7 +1130,7 @@ function PartnerStep(props: {
           <RuntimeMeta label="catalog" value={runtimeCatalogStatus} isDanger={healthError != null} />
           <RuntimeMeta label="checked_at" value={catalogServerCheckedAt ? timeText(new Date(catalogServerCheckedAt)) : "대기 중"} />
           <RuntimeMeta label="workspace" value="browser temp workspace -> auto download" />
-          <RuntimeMeta label="input_mode" value="normalized company code input" />
+          <RuntimeMeta label="input_mode" value="5-char partner code / backspace rewrite enabled" />
           {catalogError ? <div className="console-error">{catalogError}</div> : null}
         </div>
       </div>
