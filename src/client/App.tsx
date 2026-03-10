@@ -54,6 +54,11 @@ interface PackagingResultViewModel {
   blob: Blob;
 }
 
+interface SelectOption {
+  value: string;
+  label: string;
+}
+
 const PARTNER_CODE_LENGTH = 5;
 const STEP_LABELS = ["Partner Access", "Configuration", "Packaging", "Completion"];
 const API_BASE_URL = resolveApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
@@ -1164,6 +1169,15 @@ function ConfigurationStep(props: {
     canStartPackaging,
   } = props;
 
+  const groupOptions = softwareGroups.map((group) => ({
+    value: group.id,
+    label: group.name,
+  }));
+  const packageOptions = selectedGroup.packages.map((item) => ({
+    value: item.id,
+    label: item.version,
+  }));
+
   return (
     <section className="config-grid">
       <div className="config-grid__main">
@@ -1172,26 +1186,18 @@ function ConfigurationStep(props: {
           subtitle={`${catalog.company.companyName}에 할당된 전체 OS 패키지를 현재 실행 환경과 무관하게 모두 표시합니다.`}
         >
           <div className="form-grid">
-            <label className="field">
-              <span>Software Group</span>
-              <select value={selectedGroup.id} onChange={(event) => onSelectGroup(event.target.value)}>
-                {softwareGroups.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
-              <span>Version</span>
-              <select value={selectedPackage.id} onChange={(event) => onSelectPackage(event.target.value)}>
-                {selectedGroup.packages.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.version}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <ComboBox
+              label="Software Group"
+              value={selectedGroup.id}
+              options={groupOptions}
+              onChange={onSelectGroup}
+            />
+            <ComboBox
+              label="Version"
+              value={selectedPackage.id}
+              options={packageOptions}
+              onChange={onSelectPackage}
+            />
           </div>
           <div className="badge-row">
             <Badge tone="info" label={selectedPackage.os.toUpperCase()} />
@@ -1258,6 +1264,81 @@ function ConfigurationStep(props: {
         </Panel>
       </aside>
     </section>
+  );
+}
+
+function ComboBox(props: {
+  label: string;
+  value: string;
+  options: SelectOption[];
+  onChange: (value: string) => void;
+}) {
+  const { label, value, options, onChange } = props;
+  const [isOpen, setIsOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const selectedOption = options.find((option) => option.value === value) ?? options[0] ?? null;
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent): void {
+      if (rootRef.current?.contains(event.target as Node)) {
+        return;
+      }
+      setIsOpen(false);
+    }
+
+    function handleEscape(event: KeyboardEvent): void {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isOpen]);
+
+  return (
+    <div className="field">
+      <span>{label}</span>
+      <div ref={rootRef} className={`combo ${isOpen ? "is-open" : ""}`}>
+        <button
+          className="combo__trigger"
+          type="button"
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
+          onClick={() => setIsOpen((current) => !current)}
+        >
+          <span className="combo__label">{selectedOption?.label ?? ""}</span>
+          <span className="combo__chevron" aria-hidden="true" />
+        </button>
+        {isOpen ? (
+          <div className="combo__menu" role="listbox" aria-label={label}>
+            {options.map((option) => (
+              <button
+                key={option.value}
+                className={`combo__option ${option.value === value ? "is-selected" : ""}`}
+                type="button"
+                role="option"
+                aria-selected={option.value === value}
+                onClick={() => {
+                  onChange(option.value);
+                  setIsOpen(false);
+                }}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 

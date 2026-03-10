@@ -436,27 +436,78 @@ button {
   font-weight: 700;
 }
 
-.field select {
+.combo {
+  position: relative;
+}
+
+.combo__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   width: 100%;
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  padding: 14px 52px 14px 16px;
+  padding: 14px 20px 14px 16px;
   border-radius: 14px;
   border: 1px solid #4b5d75;
-  background:
-    linear-gradient(45deg, transparent 50%, #7dd3fc 50%),
-    linear-gradient(135deg, #7dd3fc 50%, transparent 50%),
-    #08111d;
-  background-position:
-    calc(100% - 22px) calc(50% - 2px),
-    calc(100% - 16px) calc(50% - 2px),
-    0 0;
-  background-size:
-    6px 6px,
-    6px 6px,
-    auto;
-  background-repeat: no-repeat;
+  background: #08111d;
+  color: #fff;
+  text-align: left;
+}
+
+.combo__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.combo__chevron {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  margin-left: 16px;
+  border-right: 2px solid #7dd3fc;
+  border-bottom: 2px solid #7dd3fc;
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 160ms ease;
+}
+
+.combo.is-open .combo__chevron {
+  transform: rotate(-135deg) translateY(1px);
+}
+
+.combo__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 14px;
+  border: 1px solid rgba(75, 93, 117, 0.92);
+  background: rgba(8, 17, 29, 0.98);
+  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.42);
+}
+
+.combo__option {
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #dbeafe;
+  text-align: left;
+}
+
+.combo__option:hover,
+.combo__option:focus-visible {
+  background: rgba(59, 130, 246, 0.14);
+  outline: none;
+}
+
+.combo__option.is-selected {
+  background: rgba(37, 99, 235, 0.22);
   color: #fff;
 }
 
