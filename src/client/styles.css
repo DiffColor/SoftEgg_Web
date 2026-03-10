@@ -194,11 +194,20 @@ button {
   padding: 24px;
 }
 
+.content--gateway {
+  display: flex;
+  align-items: center;
+}
+
 .gateway,
 .packaging,
 .completion {
   max-width: 1180px;
   margin: 0 auto;
+}
+
+.content--gateway > .gateway {
+  width: 100%;
 }
 
 .panel {
@@ -849,5 +858,9 @@ button {
 
   .panel--hero {
     padding: 22px;
+  }
+
+  .content--gateway {
+    align-items: flex-start;
   }
 }

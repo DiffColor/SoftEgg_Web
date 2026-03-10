@@ -101,20 +101,14 @@ export interface ArtifactDownloadResponseMeta {
 }
 
 export function parseCompanyCatalog(payload: unknown): CompanyCatalog {
-  const input = unwrapCatalogPayload(payload);
-  if (!hasField(input, "softwarePackages")) {
+  const input = asRecord(payload);
+  if (!Array.isArray(input.softwarePackages)) {
     throw new Error("카탈로그 응답 형식이 올바르지 않습니다.");
   }
 
-  const softwarePackages = asArray(getField(input, "softwarePackages")).map(parseRemotePackage);
-  const company = mergeRecords(
-    input,
-    asRecord(getField(input, "company")),
-  );
-
   return {
-    company: parseCompanyInfo(company),
-    softwarePackages,
+    company: parseCompanyInfo(input.company),
+    softwarePackages: asArray(input.softwarePackages).map(parseRemotePackage),
   };
 }
 
@@ -250,69 +244,60 @@ function tokenizeVersion(value: string): string[] {
 function parseCompanyInfo(payload: unknown): CompanyInfo {
   const input = asRecord(payload);
   return {
-    companyNodeId: toStringValue(getField(input, "companyNodeId")),
-    companyName: toStringValue(getField(input, "companyName")),
-    companyCode: toStringValue(getField(input, "companyCode")),
-    issuedAt: toNullableString(getField(input, "issuedAt")),
-    expiresAt: toNullableString(getField(input, "expiresAt")),
+    companyNodeId: toStringValue(input.companyNodeId),
+    companyName: toStringValue(input.companyName),
+    companyCode: toStringValue(input.companyCode),
+    issuedAt: toNullableString(input.issuedAt),
+    expiresAt: toNullableString(input.expiresAt),
   };
 }
 
 function parseRemotePackage(payload: unknown): RemoteSoftwarePackage {
   const input = asRecord(payload);
   return {
-    id: toStringValue(getField(input, "id")),
-    name: toStringValue(getField(input, "name")),
-    codeName: toStringValue(getField(input, "codeName")),
-    productId: toNumberValue(getField(input, "productId")),
-    version: toStringValue(getField(input, "version")),
-    os: toStringValue(getField(input, "os"), "all"),
-    releaseChannel: toStringValue(getField(input, "releaseChannel"), "stable"),
-    price: toNumberValue(getField(input, "price")),
-    mainBinary: parseRemoteBinary(getField(input, "mainBinary")),
-    dependencies: asArray(getField(input, "dependencies")).map(parseRemoteBinary),
-    installOptions: parseInstallOptions(getField(input, "installOptions")),
+    id: toStringValue(input.id),
+    name: toStringValue(input.name),
+    codeName: toStringValue(input.codeName),
+    productId: toNumberValue(input.productId),
+    version: toStringValue(input.version),
+    os: toStringValue(input.os, "all"),
+    releaseChannel: toStringValue(input.releaseChannel, "stable"),
+    price: toNumberValue(input.price),
+    mainBinary: parseRemoteBinary(input.mainBinary),
+    dependencies: asArray(input.dependencies).map(parseRemoteBinary),
+    installOptions: parseInstallOptions(input.installOptions),
   };
 }
 
 function parseRemoteBinary(payload: unknown): RemoteSoftwareBinary {
   const input = asRecord(payload);
   return {
-    name: toStringValue(getField(input, "name")),
-    version: toStringValue(getField(input, "version")),
-    uri: toStringValue(getField(input, "uri")),
-    checksum: toStringValue(getField(input, "checksum")),
+    name: toStringValue(input.name),
+    version: toStringValue(input.version),
+    uri: toStringValue(input.uri),
+    checksum: toStringValue(input.checksum),
   };
 }
 
 function parseInstallOptions(payload: unknown): RemoteInstallOptions {
   const input = asRecord(payload);
   return {
-    desktopShortcuts: asArray(getField(input, "desktopShortcuts")).map(parseInstallEntry),
-    startupPrograms: asArray(getField(input, "startupPrograms")).map(parseInstallEntry),
-    shortcutName: toStringValue(getField(input, "shortcutName")),
-    desktopShortcutTargets: asArray(getField(input, "desktopShortcutTargets")).map((item) =>
+    desktopShortcuts: asArray(input.desktopShortcuts).map(parseInstallEntry),
+    startupPrograms: asArray(input.startupPrograms).map(parseInstallEntry),
+    shortcutName: toStringValue(input.shortcutName),
+    desktopShortcutTargets: asArray(input.desktopShortcutTargets).map((item) =>
       toStringValue(item),
     ),
-    startupTargets: asArray(getField(input, "startupTargets")).map((item) => toStringValue(item)),
+    startupTargets: asArray(input.startupTargets).map((item) => toStringValue(item)),
   };
 }
 
 function parseInstallEntry(payload: unknown): RemoteInstallEntry {
   const input = asRecord(payload);
   return {
-    target: toStringValue(getField(input, "target")),
-    name: toStringValue(getField(input, "name")),
+    target: toStringValue(input.target),
+    name: toStringValue(input.name),
   };
-}
-
-function unwrapCatalogPayload(payload: unknown): Record<string, unknown> {
-  const input = asRecord(payload);
-  const nested = asRecord(getField(input, "data"));
-  if (hasField(nested, "softwarePackages") || hasField(nested, "company")) {
-    return nested;
-  }
-  return input;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -320,29 +305,6 @@ function asRecord(value: unknown): Record<string, unknown> {
     return {};
   }
   return value as Record<string, unknown>;
-}
-
-function mergeRecords(...records: Record<string, unknown>[]): Record<string, unknown> {
-  return Object.assign({}, ...records);
-}
-
-function hasField(record: Record<string, unknown>, key: string): boolean {
-  return getField(record, key) !== undefined;
-}
-
-function getField(record: Record<string, unknown>, key: string): unknown {
-  if (key in record) {
-    return record[key];
-  }
-
-  const normalizedKey = key.toLowerCase();
-  for (const [entryKey, value] of Object.entries(record)) {
-    if (entryKey.toLowerCase() === normalizedKey) {
-      return value;
-    }
-  }
-
-  return undefined;
 }
 
 function asArray(value: unknown): unknown[] {

@@ -135,10 +135,7 @@ export function App() {
     setIsCatalogServerChecking(true);
     setHealthError(null);
     try {
-      await apiFetch("/api/health", {
-        requestErrorMessage: "카탈로그 서버 상태 확인에 실패했습니다.",
-        invalidJsonMessage: "카탈로그 서버 응답을 처리하지 못했습니다.",
-      });
+      await probeCatalogServerRequest();
       setCatalogServerCheckedAt(new Date().toISOString());
     } catch (error) {
       setHealthError(toHealthUiMessage(error));
@@ -158,11 +155,7 @@ export function App() {
     setCatalogError(null);
 
     try {
-      const payload = await apiFetch(`/api/catalog/${partnerCode}`, {
-        requestErrorMessage: "카탈로그 조회에 실패했습니다.",
-        invalidJsonMessage: "카탈로그 서버 응답을 처리하지 못했습니다.",
-      });
-      const nextCatalog = parseCompanyCatalog(payload);
+      const nextCatalog = await fetchCatalogRequest(partnerCode);
       if (nextCatalog.softwarePackages.length === 0) {
         throw new Error("할당된 소프트웨어가 없습니다.");
       }
@@ -240,7 +233,7 @@ export function App() {
   }
 
   async function fetchRemoteSize(uri: string): Promise<number | null> {
-    const payload = await apiFetch("/api/artifact/size", {
+    const payload = await requestJson("/api/artifact/size", {
       method: "POST",
       body: { uri },
       requestErrorMessage: "원격 파일 크기 조회에 실패했습니다.",
@@ -885,7 +878,7 @@ export function App() {
         ))}
       </nav>
 
-      <main className="content">
+      <main className={currentStep === 0 ? "content content--gateway" : "content"}>
         {currentStep === 0 ? (
           <PartnerStep
             partnerCodeInputs={partnerCodeInputs}
@@ -1499,7 +1492,7 @@ function RuntimeMeta(props: { label: string; value: string; isDanger?: boolean }
   );
 }
 
-async function apiFetch(
+async function requestJson(
   path: string,
   options: {
     method?: string;
@@ -1548,6 +1541,53 @@ async function apiFetch(
   }
 
   return parsed;
+}
+
+async function probeCatalogServerRequest(): Promise<void> {
+  const response = await fetch("/api/health", {
+    method: "GET",
+    headers: {
+      accept: "application/json",
+    },
+    cache: "no-store",
+  });
+
+  if (response.ok) {
+    await response.text().catch(() => "");
+    return;
+  }
+
+  throw new Error(
+    await readApiErrorMessage(response, "카탈로그 서버 상태 확인에 실패했습니다."),
+  );
+}
+
+async function fetchCatalogRequest(companyCode: string): Promise<CompanyCatalog> {
+  const normalizedCode = companyCode.trim().toUpperCase();
+  const response = await fetch(`/api/catalog/${normalizedCode}`, {
+    method: "GET",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json",
+    },
+    cache: "no-store",
+  });
+
+  const text = await response.text();
+  const payload = parseJsonObject(text);
+
+  if (!response.ok) {
+    throw new Error(
+      (typeof payload?.message === "string" && payload.message) ||
+        "카탈로그 조회에 실패했습니다.",
+    );
+  }
+
+  if (payload == null) {
+    throw new Error("카탈로그 응답 형식이 올바르지 않습니다.");
+  }
+
+  return parseCompanyCatalog(payload);
 }
 
 function parseJsonObject(text: string): Record<string, unknown> | null {
