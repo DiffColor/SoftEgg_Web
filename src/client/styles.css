@@ -34,6 +34,8 @@ button {
 
 .shell {
   position: relative;
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
   overflow: hidden;
 }
@@ -188,6 +190,7 @@ button {
 }
 
 .content {
+  flex: 1 0 auto;
   padding: 24px;
 }
 
@@ -702,6 +705,7 @@ button {
 }
 
 .footer {
+  margin-top: auto;
   justify-content: space-between;
   gap: 20px;
   padding: 18px 24px;
