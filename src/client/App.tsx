@@ -135,7 +135,11 @@ export function App() {
     setIsCatalogServerChecking(true);
     setHealthError(null);
     try {
-      await apiFetch("/api/health");
+      const response = await fetch("/api/health", { cache: "no-store" });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({ message: "카탈로그 서버 상태 확인에 실패했습니다." }));
+        throw new Error(String(payload.message ?? "카탈로그 서버 상태 확인에 실패했습니다."));
+      }
       setCatalogServerCheckedAt(new Date().toISOString());
     } catch (error) {
       setHealthError(toHealthUiMessage(error));
