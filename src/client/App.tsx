@@ -97,6 +97,8 @@ export function App() {
 
   const partnerCode = partnerCodeInputs.join("").trim().toUpperCase();
   const isPartnerCodeComplete = /^[A-Z0-9]{5}$/.test(partnerCode);
+  const runtimeEngineStatus = healthError == null ? "edge runtime ready" : "runtime check required";
+  const runtimeCatalogStatus = healthError == null ? "catalog service connected" : "catalog service unavailable";
 
   const selectedGroup = softwareGroups.find((group) => group.id === selectedGroupId) ?? null;
   const selectedPackage =
@@ -140,7 +142,7 @@ export function App() {
       }
       setCatalogServerCheckedAt(new Date().toISOString());
     } catch (error) {
-      setHealthError(error instanceof Error ? error.message : "카탈로그 서버 상태 확인에 실패했습니다.");
+      setHealthError(toHealthUiMessage(error));
       setCatalogServerCheckedAt(new Date().toISOString());
     } finally {
       setIsHealthLoading(false);
@@ -192,7 +194,7 @@ export function App() {
         "success",
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : "카탈로그 조회에 실패했습니다.";
+      const message = toCatalogUiMessage(error);
       setCatalogError(message);
       appendLog("ERROR", message);
       showNotice("카탈로그 조회 실패", message, "danger");
@@ -456,7 +458,7 @@ export function App() {
       if (activeSessionIdRef.current !== sessionId) {
         return;
       }
-      const message = error instanceof Error ? error.message : "패키징 중 예기치 않은 오류가 발생했습니다.";
+      const message = toPackagingUiMessage(error);
       if (message === "작업이 중단되었습니다.") {
         showNotice("작업 중단", "현재 작업을 중단하고 이전 단계로 이동했습니다.", "warning");
         setCurrentStep(1);
@@ -933,6 +935,8 @@ export function App() {
             isCatalogServerChecking={isCatalogServerChecking}
             healthError={healthError}
             catalogError={catalogError}
+            runtimeEngineStatus={runtimeEngineStatus}
+            runtimeCatalogStatus={runtimeCatalogStatus}
             catalogServerCheckedAt={catalogServerCheckedAt}
             isCatalogLoading={isCatalogLoading}
             onProbe={probeHealth}
@@ -1047,6 +1051,8 @@ function PartnerStep(props: {
   isCatalogServerChecking: boolean;
   healthError: string | null;
   catalogError: string | null;
+  runtimeEngineStatus: string;
+  runtimeCatalogStatus: string;
   catalogServerCheckedAt: string | null;
   isCatalogLoading: boolean;
   onProbe: () => Promise<void>;
@@ -1062,6 +1068,8 @@ function PartnerStep(props: {
     isCatalogServerChecking,
     healthError,
     catalogError,
+    runtimeEngineStatus,
+    runtimeCatalogStatus,
     catalogServerCheckedAt,
     isCatalogLoading,
     onProbe,
@@ -1118,8 +1126,8 @@ function PartnerStep(props: {
               label={isCatalogServerChecking ? "RUN" : healthError == null ? "LIVE" : "FAIL"}
             />
           </div>
-          <RuntimeMeta label="engine" value={healthError ?? "edge runtime ready"} />
-          <RuntimeMeta label="catalog" value={healthError ?? "licensehub.ilycode.app reachable"} isDanger={healthError != null} />
+          <RuntimeMeta label="engine" value={runtimeEngineStatus} isDanger={healthError != null} />
+          <RuntimeMeta label="catalog" value={runtimeCatalogStatus} isDanger={healthError != null} />
           <RuntimeMeta label="checked_at" value={catalogServerCheckedAt ? timeText(new Date(catalogServerCheckedAt)) : "대기 중"} />
           <RuntimeMeta label="workspace" value="browser temp workspace -> auto download" />
           <RuntimeMeta label="input_mode" value="5-char partner code / backspace rewrite enabled" />
@@ -1495,6 +1503,61 @@ function RuntimeMeta(props: { label: string; value: string; isDanger?: boolean }
       <span>{props.label}</span>
       <span className={props.isDanger ? "is-danger" : ""}>{props.value}</span>
     </div>
+  );
+}
+
+function toHealthUiMessage(error: unknown): string {
+  const rawMessage = error instanceof Error ? error.message : "";
+  if (isSafeUiMessage(rawMessage, ["카탈로그 서버 상태 확인에 실패했습니다."])) {
+    return rawMessage;
+  }
+  return "서비스 연결 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+}
+
+function toCatalogUiMessage(error: unknown): string {
+  const rawMessage = error instanceof Error ? error.message : "";
+  if (
+    isSafeUiMessage(rawMessage, [
+      "회사 코드는 영문/숫자 5자리여야 합니다.",
+      "회사 코드가 만료되었거나 일치하지 않습니다.",
+      "데스크톱 패키징 가능한 소프트웨어가 없습니다.",
+      "카탈로그 조회에 실패했습니다.",
+    ])
+  ) {
+    return rawMessage;
+  }
+  return "카탈로그 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
+}
+
+function toPackagingUiMessage(error: unknown): string {
+  const rawMessage = error instanceof Error ? error.message : "";
+  if (rawMessage === "작업이 중단되었습니다.") {
+    return rawMessage;
+  }
+  if (rawMessage.includes("체크섬 검증에 실패했습니다")) {
+    return "다운로드한 파일 검증에 실패했습니다. 다시 시도해 주세요.";
+  }
+  if (
+    isSafeUiMessage(rawMessage, [
+      "패키징 중 예기치 않은 오류가 발생했습니다.",
+      "패키징에 실패했습니다.",
+    ])
+  ) {
+    return rawMessage;
+  }
+  return "패키징 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
+}
+
+function isSafeUiMessage(rawMessage: string, allowList: string[]): boolean {
+  const message = rawMessage.trim();
+  if (!message) {
+    return false;
+  }
+  if (allowList.includes(message)) {
+    return true;
+  }
+  return !/(https?:\/\/|ftp:\/\/|licensehub|api|endpoint|uri|url|ftp|socket|softegg_|wrangler|cloudflare)/i.test(
+    message,
   );
 }
 

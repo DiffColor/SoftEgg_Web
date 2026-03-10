@@ -45,7 +45,7 @@ export default {
 } satisfies ExportedHandler<Env>;
 
 async function handleHealth(env: Env): Promise<Response> {
-  const apiBaseUrl = requireEnv(env.SOFTEGG_API_BASE_URL, "SOFTEGG_API_BASE_URL");
+  const apiBaseUrl = getApiBaseUrl(env);
   const response = await fetch(new URL("/api/health", apiBaseUrl));
   if (!response.ok) {
     const message = await response.text();
@@ -63,7 +63,7 @@ async function handleHealth(env: Env): Promise<Response> {
 }
 
 async function handleCatalog(url: URL, env: Env): Promise<Response> {
-  const apiBaseUrl = requireEnv(env.SOFTEGG_API_BASE_URL, "SOFTEGG_API_BASE_URL");
+  const apiBaseUrl = getApiBaseUrl(env);
   const companyCode = url.pathname.split("/").pop()?.trim().toUpperCase() ?? "";
   if (!/^[A-Z0-9]{5}$/.test(companyCode)) {
     return json({ message: "회사 코드는 영문/숫자 5자리여야 합니다." }, 400);
@@ -73,6 +73,7 @@ async function handleCatalog(url: URL, env: Env): Promise<Response> {
   const response = await fetch(upstreamUrl, {
     headers: {
       accept: "application/json",
+      "content-type": "application/json; charset=utf-8",
     },
   });
   const text = await response.text();
@@ -128,6 +129,24 @@ async function handleArtifactDownload(request: Request, env: Env): Promise<Respo
       "cache-control": "no-store",
     },
   });
+}
+
+function getApiBaseUrl(env: Env): URL {
+  const rawValue = requireEnv(env.SOFTEGG_API_BASE_URL, "SOFTEGG_API_BASE_URL");
+  const normalized = /^[a-z][a-z0-9+.-]*:\/\//i.test(rawValue) ? rawValue : `https://${rawValue}`;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(normalized);
+  } catch {
+    throw new Error("SOFTEGG_API_BASE_URL 형식이 올바르지 않습니다.");
+  }
+
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    throw new Error("SOFTEGG_API_BASE_URL은 http 또는 https URL이어야 합니다.");
+  }
+
+  return parsed;
 }
 
 function getFtpCredentials(env: Env): {
