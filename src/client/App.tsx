@@ -159,7 +159,10 @@ export function App() {
     setCatalogError(null);
 
     try {
-      const payload = await apiFetch(`/api/catalog/${partnerCode}`);
+      const payload = await apiFetch(`/api/catalog/${partnerCode}`, {
+        requestErrorMessage: "카탈로그 조회에 실패했습니다.",
+        invalidJsonMessage: "카탈로그 서버 응답을 처리하지 못했습니다.",
+      });
       const nextCatalog = parseCompanyCatalog(payload);
       if (nextCatalog.softwarePackages.length === 0) {
         throw new Error("할당된 소프트웨어가 없습니다.");
@@ -241,6 +244,8 @@ export function App() {
     const payload = await apiFetch("/api/artifact/size", {
       method: "POST",
       body: { uri },
+      requestErrorMessage: "원격 파일 크기 조회에 실패했습니다.",
+      invalidJsonMessage: "원격 파일 크기 응답을 처리하지 못했습니다.",
     });
     return typeof payload.size === "number" ? payload.size : null;
   }
@@ -1502,9 +1507,17 @@ async function apiFetch(
     method?: string;
     body?: unknown;
     signal?: AbortSignal;
+    requestErrorMessage?: string;
+    invalidJsonMessage?: string;
   } = {},
 ): Promise<Record<string, unknown>> {
-  const { method = "GET", body, signal } = options;
+  const {
+    method = "GET",
+    body,
+    signal,
+    requestErrorMessage,
+    invalidJsonMessage = "서버 응답을 처리하지 못했습니다.",
+  } = options;
   const response = await fetch(path, {
     method,
     headers: {
@@ -1515,17 +1528,16 @@ async function apiFetch(
     signal,
   });
 
+  const text = await response.text();
+  const parsed = parseJsonObject(text);
+
   if (!response.ok) {
-    let message = `요청 실패 (${response.status})`;
-    try {
-      const parsed = (await response.json()) as Record<string, unknown>;
-      message =
-        (typeof parsed.message === "string" && parsed.message) ||
-        (typeof parsed.error === "string" && parsed.error) ||
-        message;
-    } catch {
-      // noop
-    }
+    let message = requestErrorMessage ?? `요청 실패 (${response.status})`;
+    message =
+      (typeof parsed?.message === "string" && parsed.message) ||
+      (typeof parsed?.error === "string" && parsed.error) ||
+      text.trim() ||
+      message;
     throw new Error(message);
   }
 
@@ -1533,12 +1545,37 @@ async function apiFetch(
     return {};
   }
 
-  return (await response.json()) as Record<string, unknown>;
+  if (parsed == null) {
+    throw new Error(invalidJsonMessage);
+  }
+
+  return parsed;
+}
+
+function parseJsonObject(text: string): Record<string, unknown> | null {
+  if (!text.trim()) {
+    return {};
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (typeof parsed !== "object" || parsed == null || Array.isArray(parsed)) {
+      return null;
+    }
+    return parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
 }
 
 function toHealthUiMessage(error: unknown): string {
   const rawMessage = error instanceof Error ? error.message : "";
-  if (isSafeUiMessage(rawMessage, ["카탈로그 서버 상태 확인에 실패했습니다."])) {
+  if (
+    isSafeUiMessage(rawMessage, [
+      "카탈로그 서버 상태 확인에 실패했습니다.",
+      "카탈로그 서버 응답을 처리하지 못했습니다.",
+    ])
+  ) {
     return rawMessage;
   }
   return "서비스 연결 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.";
