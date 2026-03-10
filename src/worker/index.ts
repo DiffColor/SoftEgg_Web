@@ -48,19 +48,53 @@ export default {
 async function handleHealth(env: Env): Promise<Response> {
   const apiBaseUrl = getApiBaseUrl(env);
   const response = await fetch(new URL("/api/health", apiBaseUrl));
+  const contentType = response.headers.get("content-type") || "";
+  const text = await response.text();
   if (!response.ok) {
-    const message = await response.text();
     return json(
       {
         ok: false,
-        message: message.trim() || "카탈로그 서버 상태 확인에 실패했습니다.",
+        message: text.trim() || "카탈로그 서버 상태 확인에 실패했습니다.",
       },
       response.status,
     );
   }
 
-  const payload: HealthProbeResponse = { ok: true };
-  return json(payload);
+  if (!contentType.toLowerCase().includes("application/json")) {
+    return json(
+      {
+        ok: false,
+        message: "카탈로그 서버 상태 응답이 JSON 형식이 아닙니다.",
+      },
+      502,
+    );
+  }
+
+  let upstreamPayload: unknown;
+  try {
+    upstreamPayload = JSON.parse(text);
+  } catch {
+    return json(
+      {
+        ok: false,
+        message: "카탈로그 서버 상태 응답을 처리하지 못했습니다.",
+      },
+      502,
+    );
+  }
+
+  if (!isHealthResponse(upstreamPayload)) {
+    return json(
+      {
+        ok: false,
+        message: "카탈로그 서버 상태 응답 형식이 올바르지 않습니다.",
+      },
+      502,
+    );
+  }
+
+  const healthPayload: HealthProbeResponse = { ok: true };
+  return json(healthPayload);
 }
 
 async function handleCatalog(url: URL, env: Env): Promise<Response> {
@@ -78,6 +112,17 @@ async function handleCatalog(url: URL, env: Env): Promise<Response> {
     },
   });
   const text = await response.text();
+  const contentType = response.headers.get("content-type") || "";
+
+  if (response.ok && !looksLikeCatalogPayload(text, contentType)) {
+    return json(
+      {
+        message: "카탈로그 서버 응답을 처리하지 못했습니다.",
+      },
+      502,
+    );
+  }
+
   return new Response(text, {
     status: response.status,
     headers: {
@@ -183,6 +228,32 @@ function normalizeCompanyCode(value: string): string {
     .trim()
     .replace(/\s+/g, "")
     .toUpperCase();
+}
+
+function isHealthResponse(value: unknown): boolean {
+  if (typeof value !== "object" || value == null || Array.isArray(value)) {
+    return false;
+  }
+  const input = value as Record<string, unknown>;
+  return typeof input.status === "string" && input.status.trim().length > 0;
+}
+
+function looksLikeCatalogPayload(text: string, contentType: string): boolean {
+  if (!contentType.toLowerCase().includes("application/json")) {
+    return false;
+  }
+
+  try {
+    const payload: unknown = JSON.parse(text);
+    if (typeof payload !== "object" || payload == null || Array.isArray(payload)) {
+      return false;
+    }
+
+    const input = payload as Record<string, unknown>;
+    return Array.isArray(input.softwarePackages);
+  } catch {
+    return false;
+  }
 }
 
 function parseFtpEndpoint(hostValue: string, portValue?: string): {

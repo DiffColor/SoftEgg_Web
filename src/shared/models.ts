@@ -103,6 +103,7 @@ export interface ArtifactDownloadResponseMeta {
 export function parseCompanyCatalog(payload: unknown): CompanyCatalog {
   const input = asRecord(payload);
   if (!Array.isArray(input.softwarePackages)) {
+    console.error("[SoftEgg] Invalid catalog payload", payload);
     throw new Error("카탈로그 응답 형식이 올바르지 않습니다.");
   }
 

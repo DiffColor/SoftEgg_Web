@@ -138,6 +138,7 @@ export function App() {
       await probeCatalogServerRequest();
       setCatalogServerCheckedAt(new Date().toISOString());
     } catch (error) {
+      logClientError("health probe failed", error);
       setHealthError(toHealthUiMessage(error));
       setCatalogServerCheckedAt(new Date().toISOString());
     } finally {
@@ -186,6 +187,7 @@ export function App() {
         "success",
       );
     } catch (error) {
+      logClientError("catalog authorization failed", error, { partnerCode });
       const message = toCatalogUiMessage(error);
       setCatalogError(message);
       appendLog("ERROR", message);
@@ -206,7 +208,8 @@ export function App() {
       try {
         const size = await fetchRemoteSize(binary.uri);
         setRemoteSizeCache((current) => ({ ...current, [uri]: size }));
-      } catch {
+      } catch (error) {
+        logClientError("remote size probe failed", error, { uri });
         setRemoteSizeCache((current) => ({ ...current, [uri]: null }));
       } finally {
         setRemoteSizeLoading((current) => ({ ...current, [uri]: false }));
@@ -442,6 +445,11 @@ export function App() {
         }
       }, 1600);
     } catch (error) {
+      logClientError("packaging failed", error, {
+        currentTaskLabel,
+        selectedPackageId,
+        selectedGroupId,
+      });
       if (activeSessionIdRef.current !== sessionId) {
         return;
       }
@@ -1529,6 +1537,13 @@ async function requestJson(
       (typeof parsed?.error === "string" && parsed.error) ||
       text.trim() ||
       message;
+    console.error("[SoftEgg] API request failed", {
+      path,
+      method,
+      status: response.status,
+      responseText: text.slice(0, 1000),
+      parsed,
+    });
     throw new Error(message);
   }
 
@@ -1537,6 +1552,12 @@ async function requestJson(
   }
 
   if (parsed == null) {
+    console.error("[SoftEgg] API response was not valid JSON object", {
+      path,
+      method,
+      status: response.status,
+      responseText: text.slice(0, 1000),
+    });
     throw new Error(invalidJsonMessage);
   }
 
@@ -1553,10 +1574,19 @@ async function probeCatalogServerRequest(): Promise<void> {
   });
 
   if (response.ok) {
-    await response.text().catch(() => "");
+    const text = await response.text().catch(() => "");
+    if (text.trim()) {
+      console.debug("[SoftEgg] Health response", {
+        status: response.status,
+        responseText: text.slice(0, 400),
+      });
+    }
     return;
   }
 
+  console.error("[SoftEgg] Health request failed", {
+    status: response.status,
+  });
   throw new Error(
     await readApiErrorMessage(response, "카탈로그 서버 상태 확인에 실패했습니다."),
   );
@@ -1577,6 +1607,12 @@ async function fetchCatalogRequest(companyCode: string): Promise<CompanyCatalog>
   const payload = parseJsonObject(text);
 
   if (!response.ok) {
+    console.error("[SoftEgg] Catalog request failed", {
+      companyCode: normalizedCode,
+      status: response.status,
+      responseText: text.slice(0, 1000),
+      payload,
+    });
     throw new Error(
       (typeof payload?.message === "string" && payload.message) ||
         "카탈로그 조회에 실패했습니다.",
@@ -1584,6 +1620,11 @@ async function fetchCatalogRequest(companyCode: string): Promise<CompanyCatalog>
   }
 
   if (payload == null) {
+    console.error("[SoftEgg] Catalog response was not valid JSON object", {
+      companyCode: normalizedCode,
+      status: response.status,
+      responseText: text.slice(0, 1000),
+    });
     throw new Error("카탈로그 응답 형식이 올바르지 않습니다.");
   }
 
@@ -1617,12 +1658,21 @@ async function readApiErrorMessage(response: Response, fallbackMessage: string):
   );
 }
 
+function logClientError(message: string, error: unknown, context?: Record<string, unknown>): void {
+  console.error(`[SoftEgg] ${message}`, {
+    error,
+    ...(context ? { context } : {}),
+  });
+}
+
 function toHealthUiMessage(error: unknown): string {
   const rawMessage = error instanceof Error ? error.message : "";
   if (
     isSafeUiMessage(rawMessage, [
       "카탈로그 서버 상태 확인에 실패했습니다.",
       "카탈로그 서버 응답을 처리하지 못했습니다.",
+      "카탈로그 서버 상태 응답이 JSON 형식이 아닙니다.",
+      "카탈로그 서버 상태 응답 형식이 올바르지 않습니다.",
     ])
   ) {
     return rawMessage;
