@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "soft-egg-web",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-03-10",
+  "assets": {
+    "directory": "./dist"
+  },
+  "vars": {
+    "SOFTEGG_API_BASE_URL": "https://licensehub.ilycode.app",
+    "SOFTEGG_FTP_HOST": "ilysrv.ddns.net",
+    "SOFTEGG_FTP_USER": "asdf",
+    "SOFTEGG_FTP_PASSWORD": "Emfndhk!"
+  }
+}
