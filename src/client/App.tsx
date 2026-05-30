@@ -6,6 +6,7 @@ import {
   createManifest,
   getDependencyKey,
   getFileName,
+  getSoftwarePackageIdentity,
   hasUri,
   parseCompanyCatalog,
   type CompanyCatalog,
@@ -108,7 +109,8 @@ export function App() {
 
   const selectedGroup = softwareGroups.find((group) => group.id === selectedGroupId) ?? null;
   const selectedPackage =
-    selectedGroup?.packages.find((item) => item.id === selectedPackageId) ?? null;
+    selectedGroup?.packages.find((item) => getSoftwarePackageIdentity(item) === selectedPackageId) ??
+    null;
   const selectedDependencyKeySet = new Set(selectedDependencyKeys);
   const selectedDependencies =
     selectedPackage?.dependencies.filter((item) => selectedDependencyKeySet.has(getDependencyKey(item))) ??
@@ -177,7 +179,7 @@ export function App() {
       setCatalog(nextCatalog);
       setSoftwareGroups(groups);
       setSelectedGroupId(firstGroup.id);
-      setSelectedPackageId(firstPackage.id);
+      setSelectedPackageId(getSoftwarePackageIdentity(firstPackage));
       setSelectedDependencyKeys(
         firstPackage.dependencies.filter(hasUri).map((item) => getDependencyKey(item)),
       );
@@ -258,7 +260,7 @@ export function App() {
     }
     const nextPackage = nextGroup.packages[0];
     setSelectedGroupId(nextGroup.id);
-    setSelectedPackageId(nextPackage.id);
+    setSelectedPackageId(getSoftwarePackageIdentity(nextPackage));
     setSelectedDependencyKeys(
       nextPackage.dependencies.filter(hasUri).map((item) => getDependencyKey(item)),
     );
@@ -270,11 +272,12 @@ export function App() {
       return;
     }
     const nextPackage =
-      selectedGroup.packages.find((item) => item.id === packageId) ?? selectedGroup.packages[0];
+      selectedGroup.packages.find((item) => getSoftwarePackageIdentity(item) === packageId) ??
+      selectedGroup.packages[0];
     if (!nextPackage) {
       return;
     }
-    setSelectedPackageId(nextPackage.id);
+    setSelectedPackageId(getSoftwarePackageIdentity(nextPackage));
     setSelectedDependencyKeys(
       nextPackage.dependencies.filter(hasUri).map((item) => getDependencyKey(item)),
     );
@@ -324,7 +327,7 @@ export function App() {
 
     appendLog(
       "INFO",
-      `패키징 시작: ${catalog.company.companyName} / ${selectedPackage.name} ${selectedPackage.version}`,
+      `패키징 시작: ${catalog.company.companyName} / ${selectedPackage.groupName} / ${selectedPackage.name} ${selectedPackage.version} / ${selectedPackage.os}`,
     );
 
     elapsedTimerRef.current = window.setInterval(() => {
@@ -382,7 +385,12 @@ export function App() {
         });
       }
 
-      const packageFileName = buildPackageFileName(selectedPackage.name, selectedPackage.version);
+      const packageFileName = buildPackageFileName(
+        selectedPackage.groupName,
+        selectedPackage.name,
+        selectedPackage.version,
+        selectedPackage.os,
+      );
       const generatedAt = new Date().toISOString();
       const manifest = createManifest({
         company: catalog.company,
@@ -1171,10 +1179,10 @@ function ConfigurationStep(props: {
 
   const groupOptions = softwareGroups.map((group) => ({
     value: group.id,
-    label: group.name,
+    label: `${group.groupName} / ${group.name} / ${group.os.toUpperCase()}`,
   }));
   const packageOptions = selectedGroup.packages.map((item) => ({
-    value: item.id,
+    value: getSoftwarePackageIdentity(item),
     label: item.version,
   }));
 
@@ -1187,19 +1195,20 @@ function ConfigurationStep(props: {
         >
           <div className="form-grid">
             <ComboBox
-              label="Software Group"
+              label="Group / Software / OS"
               value={selectedGroup.id}
               options={groupOptions}
               onChange={onSelectGroup}
             />
             <ComboBox
               label="Version"
-              value={selectedPackage.id}
+              value={getSoftwarePackageIdentity(selectedPackage)}
               options={packageOptions}
               onChange={onSelectPackage}
             />
           </div>
           <div className="badge-row">
+            <Badge tone="info" label={selectedPackage.groupName} />
             <Badge tone="info" label={selectedPackage.os.toUpperCase()} />
             <Badge tone="info" label={selectedPackage.releaseChannel.toUpperCase()} />
             <Badge tone={canStartPackaging ? "success" : "danger"} label={canStartPackaging ? "패키징 가능" : "패키징 차단"} />
@@ -1250,7 +1259,9 @@ function ConfigurationStep(props: {
       <aside className="config-grid__side">
         <Panel title="Packaging Snapshot">
           <SummaryRow label="Partner" value={`${catalog.company.companyName} (${catalog.company.companyCode})`} />
+          <SummaryRow label="Group" value={selectedPackage.groupName} />
           <SummaryRow label="Product" value={`${selectedPackage.name} ${selectedPackage.version}`} />
+          <SummaryRow label="OS" value={selectedPackage.os} />
           <SummaryRow label="Code Name" value={selectedPackage.codeName} />
           <SummaryRow label="Selected Dependencies" value={`${selectedDependencyKeys.size}/${selectedPackage.dependencies.length}`} />
           <SummaryRow label="Estimated Payload" value={estimatedPayloadLabel} />
@@ -1459,6 +1470,7 @@ function CompletionStep(props: { result: PackagingResultViewModel; onDownloadAga
           </div>
           <div>
             <SummaryRow label="Partner" value={`${result.company.companyName} (${result.company.companyCode})`} />
+            <SummaryRow label="Group" value={result.selectedPackage.groupName} />
             <SummaryRow label="Software" value={`${result.selectedPackage.name} ${result.selectedPackage.version}`} />
             <SummaryRow label="OS" value={result.selectedPackage.os} />
             <SummaryRow label="Release Channel" value={result.selectedPackage.releaseChannel} />

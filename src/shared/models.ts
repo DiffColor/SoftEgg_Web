@@ -13,6 +13,7 @@ export interface CompanyInfo {
 
 export interface RemoteSoftwarePackage {
   id: string;
+  groupName: string;
   name: string;
   codeName: string;
   productId: number;
@@ -47,6 +48,7 @@ export interface RemoteInstallEntry {
 
 export interface SoftwareGroupViewModel {
   id: string;
+  groupName: string;
   name: string;
   codeName: string;
   os: string;
@@ -67,6 +69,7 @@ export interface PackagingManifest {
   softwarePackage: Pick<
     RemoteSoftwarePackage,
     | "id"
+    | "groupName"
     | "name"
     | "codeName"
     | "productId"
@@ -116,7 +119,7 @@ export function parseCompanyCatalog(payload: unknown): CompanyCatalog {
 export function buildGroups(catalog: CompanyCatalog): SoftwareGroupViewModel[] {
   const groups = new Map<string, RemoteSoftwarePackage[]>();
   for (const item of catalog.softwarePackages) {
-    const key = `${item.name}|${item.codeName}|${item.os.toLowerCase()}|${item.releaseChannel.toLowerCase()}`;
+    const key = getSoftwareGroupIdentity(item);
     const list = groups.get(key) ?? [];
     list.push(item);
     groups.set(key, list);
@@ -130,6 +133,7 @@ export function buildGroups(catalog: CompanyCatalog): SoftwareGroupViewModel[] {
       const first = sorted[0];
       return {
         id,
+        groupName: first.groupName,
         name: first.name,
         codeName: first.codeName,
         os: first.os,
@@ -138,12 +142,25 @@ export function buildGroups(catalog: CompanyCatalog): SoftwareGroupViewModel[] {
       };
     })
     .sort((left, right) => {
+      const byGroup = left.groupName.toLowerCase().localeCompare(right.groupName.toLowerCase());
+      if (byGroup !== 0) {
+        return byGroup;
+      }
       const byName = left.name.toLowerCase().localeCompare(right.name.toLowerCase());
       if (byName !== 0) {
         return byName;
       }
-      return left.codeName.toLowerCase().localeCompare(right.codeName.toLowerCase());
+      return left.os.toLowerCase().localeCompare(right.os.toLowerCase());
     });
+}
+
+export function getSoftwarePackageIdentity(item: RemoteSoftwarePackage): string {
+  return JSON.stringify([
+    normalizeIdentitySegment(item.groupName),
+    normalizeIdentitySegment(item.name),
+    normalizeIdentitySegment(item.version),
+    normalizeIdentitySegment(item.os),
+  ]);
 }
 
 export function hasUri(binary: RemoteSoftwareBinary): boolean {
@@ -191,6 +208,7 @@ export function createManifest(input: {
     company,
     softwarePackage: {
       id: selectedPackage.id,
+      groupName: selectedPackage.groupName,
       name: selectedPackage.name,
       codeName: selectedPackage.codeName,
       productId: selectedPackage.productId,
@@ -206,7 +224,7 @@ export function createManifest(input: {
     generatedAt,
     tool: {
       name: "SoftEgg Packaging Tool",
-      schemaVersion: 1,
+      schemaVersion: 2,
     },
   };
 }
@@ -257,6 +275,7 @@ function parseRemotePackage(payload: unknown): RemoteSoftwarePackage {
   const input = asRecord(payload);
   return {
     id: toStringValue(input.id),
+    groupName: toStringValue(input.groupName),
     name: toStringValue(input.name),
     codeName: toStringValue(input.codeName),
     productId: toNumberValue(input.productId),
@@ -268,6 +287,18 @@ function parseRemotePackage(payload: unknown): RemoteSoftwarePackage {
     dependencies: asArray(input.dependencies).map(parseRemoteBinary),
     installOptions: parseInstallOptions(input.installOptions),
   };
+}
+
+function getSoftwareGroupIdentity(item: RemoteSoftwarePackage): string {
+  return JSON.stringify([
+    normalizeIdentitySegment(item.groupName),
+    normalizeIdentitySegment(item.name),
+    normalizeIdentitySegment(item.os),
+  ]);
+}
+
+function normalizeIdentitySegment(value: string): string {
+  return value.trim().toLowerCase();
 }
 
 function parseRemoteBinary(payload: unknown): RemoteSoftwareBinary {

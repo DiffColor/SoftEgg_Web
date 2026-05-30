@@ -29,8 +29,13 @@ export function sanitizeSegment(value: string): string {
   return sanitized.length > 0 ? sanitized : "artifact";
 }
 
-export function buildPackageFileName(name: string, version: string): string {
-  return `${sanitizeSegment(name)}_${sanitizeSegment(version)}.segg`;
+export function buildPackageFileName(
+  groupName: string,
+  name: string,
+  version: string,
+  os: string,
+): string {
+  return `${sanitizeSegment(groupName)}_${sanitizeSegment(name)}_${sanitizeSegment(version)}_${sanitizeSegment(os)}.segg`;
 }
 
 export function humanizeTask(rawTask: string): string {
