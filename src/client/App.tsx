@@ -18,8 +18,10 @@ import {
 } from "../shared/models";
 import {
   buildPackageFileName,
+  buildSoftwareName,
   formatBytes,
   formatDateTime,
+  hasDistinctSoftwareNameParts,
   humanizeLog,
   humanizeTask,
   sanitizeSegment,
@@ -327,7 +329,7 @@ export function App() {
 
     appendLog(
       "INFO",
-      `패키징 시작: ${catalog.company.companyName} / ${selectedPackage.groupName} / ${selectedPackage.name} ${selectedPackage.version} / ${selectedPackage.os}`,
+      `패키징 시작: ${catalog.company.companyName} / ${buildSoftwareName(selectedPackage.groupName, selectedPackage.name)} ${selectedPackage.version} / ${selectedPackage.os}`,
     );
 
     elapsedTimerRef.current = window.setInterval(() => {
@@ -1177,9 +1179,17 @@ function ConfigurationStep(props: {
     canStartPackaging,
   } = props;
 
+  const selectedSoftwareName = buildSoftwareName(
+    selectedPackage.groupName,
+    selectedPackage.name,
+  );
+  const hasDistinctGroupName = hasDistinctSoftwareNameParts(
+    selectedPackage.groupName,
+    selectedPackage.name,
+  );
   const groupOptions = softwareGroups.map((group) => ({
     value: group.id,
-    label: `${group.groupName} / ${group.name} / ${group.os.toUpperCase()}`,
+    label: `${buildSoftwareName(group.groupName, group.name)} / ${group.os.toUpperCase()}`,
   }));
   const packageOptions = selectedGroup.packages.map((item) => ({
     value: getSoftwarePackageIdentity(item),
@@ -1208,7 +1218,7 @@ function ConfigurationStep(props: {
             />
           </div>
           <div className="badge-row">
-            <Badge tone="info" label={selectedPackage.groupName} />
+            {hasDistinctGroupName ? <Badge tone="info" label={selectedPackage.groupName} /> : null}
             <Badge tone="info" label={selectedPackage.os.toUpperCase()} />
             <Badge tone="info" label={selectedPackage.releaseChannel.toUpperCase()} />
             <Badge tone={canStartPackaging ? "success" : "danger"} label={canStartPackaging ? "패키징 가능" : "패키징 차단"} />
@@ -1259,8 +1269,8 @@ function ConfigurationStep(props: {
       <aside className="config-grid__side">
         <Panel title="Packaging Snapshot">
           <SummaryRow label="Partner" value={`${catalog.company.companyName} (${catalog.company.companyCode})`} />
-          <SummaryRow label="Group" value={selectedPackage.groupName} />
-          <SummaryRow label="Product" value={`${selectedPackage.name} ${selectedPackage.version}`} />
+          {hasDistinctGroupName ? <SummaryRow label="Group" value={selectedPackage.groupName} /> : null}
+          <SummaryRow label="Product" value={`${selectedSoftwareName} ${selectedPackage.version}`} />
           <SummaryRow label="OS" value={selectedPackage.os} />
           <SummaryRow label="Code Name" value={selectedPackage.codeName} />
           <SummaryRow label="Selected Dependencies" value={`${selectedDependencyKeys.size}/${selectedPackage.dependencies.length}`} />
@@ -1451,6 +1461,14 @@ function PackagingStep(props: {
 
 function CompletionStep(props: { result: PackagingResultViewModel; onDownloadAgain: () => void }) {
   const { result, onDownloadAgain } = props;
+  const softwareName = buildSoftwareName(
+    result.selectedPackage.groupName,
+    result.selectedPackage.name,
+  );
+  const hasDistinctGroupName = hasDistinctSoftwareNameParts(
+    result.selectedPackage.groupName,
+    result.selectedPackage.name,
+  );
 
   return (
     <section className="completion">
@@ -1470,8 +1488,8 @@ function CompletionStep(props: { result: PackagingResultViewModel; onDownloadAga
           </div>
           <div>
             <SummaryRow label="Partner" value={`${result.company.companyName} (${result.company.companyCode})`} />
-            <SummaryRow label="Group" value={result.selectedPackage.groupName} />
-            <SummaryRow label="Software" value={`${result.selectedPackage.name} ${result.selectedPackage.version}`} />
+            {hasDistinctGroupName ? <SummaryRow label="Group" value={result.selectedPackage.groupName} /> : null}
+            <SummaryRow label="Software" value={`${softwareName} ${result.selectedPackage.version}`} />
             <SummaryRow label="OS" value={result.selectedPackage.os} />
             <SummaryRow label="Release Channel" value={result.selectedPackage.releaseChannel} />
             <SummaryRow label="Dependency Count" value={`${result.dependencyArtifacts.length}`} />

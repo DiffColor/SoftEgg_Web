@@ -29,13 +29,45 @@ export function sanitizeSegment(value: string): string {
   return sanitized.length > 0 ? sanitized : "artifact";
 }
 
+export function buildSoftwareName(groupName: string, name: string): string {
+  const segments = uniqueSoftwareNameSegments(groupName, name);
+  return segments.length > 0 ? segments.join(" / ") : "-";
+}
+
+export function hasDistinctSoftwareNameParts(groupName: string, name: string): boolean {
+  const normalizedGroup = normalizeNamePart(groupName);
+  const normalizedName = normalizeNamePart(name);
+  return Boolean(normalizedGroup && normalizedName && normalizedGroup !== normalizedName);
+}
+
 export function buildPackageFileName(
   groupName: string,
   name: string,
   version: string,
   os: string,
 ): string {
-  return `${sanitizeSegment(groupName)}_${sanitizeSegment(name)}_${sanitizeSegment(version)}_${sanitizeSegment(os)}.segg`;
+  const softwareSegments = uniqueSoftwareNameSegments(groupName, name);
+  const prefix =
+    softwareSegments.length > 0
+      ? softwareSegments.map((segment) => sanitizeSegment(segment)).join("_")
+      : sanitizeSegment("software");
+  return `${prefix}_${sanitizeSegment(version)}_${sanitizeSegment(os)}.segg`;
+}
+
+function uniqueSoftwareNameSegments(groupName: string, name: string): string[] {
+  const group = groupName.trim();
+  const software = name.trim();
+  if (!group) {
+    return software ? [software] : [];
+  }
+  if (!software || normalizeNamePart(group) === normalizeNamePart(software)) {
+    return [group];
+  }
+  return [group, software];
+}
+
+function normalizeNamePart(value: string): string {
+  return value.trim().toLowerCase();
 }
 
 export function humanizeTask(rawTask: string): string {
